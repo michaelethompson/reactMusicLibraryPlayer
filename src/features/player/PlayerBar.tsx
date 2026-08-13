@@ -1,22 +1,22 @@
 import { usePlayer } from './PlayerProvider';
-import { formatDuration } from '../../lib/format';
+import { formatDuration, hymnReference } from '../../lib/format';
 
 export function PlayerBar() {
   const { currentTrack, currentItem, isPlaying, currentTime, duration, toggle, stop, next, previous, seek } =
     usePlayer();
 
-  const label = currentTrack
-    ? [currentTrack.hymnalCode, currentTrack.hymnNumber].filter(Boolean).join(' ')
-    : '';
+  const hymn = currentItem?.hymn ?? currentTrack?.hymns[0] ?? null;
 
   return (
     <footer className="player-bar">
       <div className="player-bar__now">
         {currentTrack ? (
           <>
-            <strong>{currentTrack.hymnTitle ?? currentTrack.originalFilename}</strong>
+            <strong>{hymn?.title ?? currentTrack.originalFilename}</strong>
             <span className="muted">
-              {[label, currentTrack.tuneName, currentItem?.label].filter(Boolean).join(' · ')}
+              {[hymn && hymnReference(hymn), currentTrack.tuneName, currentItem?.label]
+                .filter(Boolean)
+                .join(' · ')}
             </span>
           </>
         ) : (

@@ -54,6 +54,7 @@ export const serviceRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as {
       kind?: ServiceItemKind;
       trackId?: number | null;
+      hymnId?: number | null;
       label?: string | null;
       verses?: string | null;
       gapAfterMs?: number;
@@ -67,13 +68,14 @@ export const serviceRoutes: FastifyPluginAsync = async (app) => {
 
     db.prepare(`
       INSERT INTO service_items
-        (service_id, position, kind, track_id, label, verses, gap_after_ms, auto_advance)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (service_id, position, kind, track_id, hymn_id, label, verses, gap_after_ms, auto_advance)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       serviceId,
       nextPosition(serviceId),
       kind,
       body.trackId ?? null,
+      body.hymnId ?? null,
       body.label ?? null,
       body.verses ?? null,
       body.gapAfterMs ?? 0,
@@ -89,6 +91,7 @@ export const serviceRoutes: FastifyPluginAsync = async (app) => {
       position?: number;
       label?: string | null;
       verses?: string | null;
+      trackId?: number | null;
       gapAfterMs?: number;
       autoAdvance?: boolean;
     };
@@ -98,6 +101,7 @@ export const serviceRoutes: FastifyPluginAsync = async (app) => {
     if (body.position !== undefined) { sets.push('position = ?'); params.push(body.position); }
     if (body.label !== undefined) { sets.push('label = ?'); params.push(body.label); }
     if (body.verses !== undefined) { sets.push('verses = ?'); params.push(body.verses); }
+    if (body.trackId !== undefined) { sets.push('track_id = ?'); params.push(body.trackId); }
     if (body.gapAfterMs !== undefined) { sets.push('gap_after_ms = ?'); params.push(body.gapAfterMs); }
     if (body.autoAdvance !== undefined) { sets.push('auto_advance = ?'); params.push(body.autoAdvance ? 1 : 0); }
     if (sets.length === 0) return reply.code(400).send({ error: 'No updatable fields supplied' });

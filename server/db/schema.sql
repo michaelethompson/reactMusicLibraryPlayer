@@ -64,10 +64,13 @@ CREATE TABLE IF NOT EXISTS tracks (
   mime              TEXT NOT NULL,
   duration_ms       INTEGER,
   bitrate           INTEGER,
+  -- Tune, tempo, key and verse count are what identify one recording from another.
   tune_id           INTEGER REFERENCES tunes(id) ON DELETE SET NULL,
-  copyright_id      INTEGER REFERENCES copyrights(id) ON DELETE SET NULL,
+  tempo_bpm         INTEGER,
+  music_key         TEXT,
+  verse_count       INTEGER,
   arrangement       TEXT,
-  verses            TEXT,
+  copyright_id      INTEGER REFERENCES copyrights(id) ON DELETE SET NULL,
   raw_tags          TEXT,
   ingested_at       TEXT NOT NULL
 );
@@ -99,10 +102,10 @@ CREATE TABLE IF NOT EXISTS service_items (
   -- REAL so a drag-reorder can insert between neighbours without renumbering.
   position     REAL NOT NULL,
   kind         TEXT NOT NULL CHECK (kind IN ('hymn', 'spoken', 'silence', 'note')),
-  track_id     INTEGER REFERENCES tracks(id) ON DELETE SET NULL,
   hymn_id      INTEGER REFERENCES hymns(id) ON DELETE SET NULL,
+  -- Which of the hymn's linked recordings the operator chose to play.
+  track_id     INTEGER REFERENCES tracks(id) ON DELETE SET NULL,
   label        TEXT,
-  verses       TEXT,
   gap_after_ms INTEGER NOT NULL DEFAULT 0,
   auto_advance INTEGER NOT NULL DEFAULT 0
 );

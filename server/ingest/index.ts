@@ -2,49 +2,12 @@ import { mkdir, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { db, MEDIA_ROOT, reindexHymn, transaction } from '../db/index.ts';
 import { getTrack } from '../db/queries.ts';
+import { addAltTunes, lastId, linkTrack, resolveHymnal, resolveTune } from '../db/resolvers.ts';
 import { sha256File, shardedPath } from './hash.ts';
 import { parseTags, type ParsedTags } from './tagParser.ts';
 import type { IngestResult } from '@shared/types';
 
 type Issue = IngestResult['issues'][number];
-
-function lastId(result: { lastInsertRowid: number | bigint }): number {
-  return Number(result.lastInsertRowid);
-}
-
-function resolveHymnal(code: string): number {
-  const alias = db
-    .prepare('SELECT hymnal_id AS id FROM hymnal_aliases WHERE alias = ?')
-    .get(code) as { id: number } | undefined;
-  if (alias) return Number(alias.id);
-
-  const existing = db.prepare('SELECT id FROM hymnals WHERE code = ?').get(code) as
-    | { id: number }
-    | undefined;
-  if (existing) return Number(existing.id);
-
-  return lastId(
-    db.prepare('INSERT INTO hymnals (code, title) VALUES (?, ?)').run(code, code),
-  );
-}
-
-function resolveTune(name: string, meter: string | null, composer: string | null): number {
-  const existing = db.prepare('SELECT id FROM tunes WHERE name = ?').get(name) as
-    | { id: number }
-    | undefined;
-  if (existing) {
-    // Backfill details a later, better-tagged file supplies.
-    db.prepare(
-      'UPDATE tunes SET meter = COALESCE(meter, ?), composer = COALESCE(composer, ?) WHERE id = ?',
-    ).run(meter, composer, existing.id);
-    return Number(existing.id);
-  }
-  return lastId(
-    db
-      .prepare('INSERT INTO tunes (name, meter, composer) VALUES (?, ?, ?)')
-      .run(name, meter, composer),
-  );
-}
 
 function resolveHymn(hymnalId: number, tags: ParsedTags, primaryTuneId: number | null): number {
   const number = tags.hymnNumber!;
@@ -130,8 +93,21 @@ export async function ingestFile(
     | { id: number }
     | undefined;
   if (duplicate) {
+    // Re-uploading a file under different hymn tags files it under that hymn too
+    // rather than discarding it, since one recording may serve several hymns.
+    const tags = await parseTags(tmpPath).catch(() => null);
     await unlink(tmpPath).catch(() => {});
-    return { track: getTrack(Number(duplicate.id))!, duplicate: true, issues: [] };
+
+    const trackId = Number(duplicate.id);
+    if (tags?.hymnalCode && tags.hymnNumber) {
+      transaction(() => {
+        const tuneId = tags.tuneName ? resolveTune(tags.tuneName, tags.meter, tags.composer) : null;
+        const hymnId = resolveHymn(resolveHymnal(tags.hymnalCode!), tags, tuneId);
+        addAltTunes(hymnId, tags.altTuneNames);
+        linkTrack(hymnId, trackId);
+      });
+    }
+    return { track: getTrack(trackId)!, duplicate: true, issues: [] };
   }
 
   const tags = await parseTags(tmpPath);
@@ -155,13 +131,7 @@ export async function ingestFile(
     if (tags.hymnalCode && tags.hymnNumber) {
       const hymnalId = resolveHymnal(tags.hymnalCode);
       hymnId = resolveHymn(hymnalId, tags, tuneId);
-
-      const altStmt = db.prepare(
-        'INSERT OR IGNORE INTO hymn_alt_tunes (hymn_id, tune_id, rank) VALUES (?, ?, ?)',
-      );
-      tags.altTuneNames.forEach((name, index) => {
-        altStmt.run(hymnId!, resolveTune(name, null, null), index);
-      });
+      addAltTunes(hymnId, tags.altTuneNames);
     } else {
       issues.push({
         severity: 'error',
@@ -180,8 +150,8 @@ export async function ingestFile(
         .prepare(`
           INSERT INTO tracks
             (sha256, storage_path, original_filename, mime, duration_ms, bitrate,
-             hymn_id, tune_id, copyright_id, arrangement, verses, raw_tags, ingested_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             tune_id, copyright_id, arrangement, verses, raw_tags, ingested_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
         .run(
           sha256,
@@ -190,7 +160,6 @@ export async function ingestFile(
           mime,
           tags.durationMs,
           tags.bitrate,
-          hymnId,
           tuneId,
           copyrightId,
           tags.arrangement,
@@ -200,6 +169,7 @@ export async function ingestFile(
         ),
     );
 
+    if (hymnId !== null) linkTrack(hymnId, id);
     recordIssues(id, issues);
     return id;
   });

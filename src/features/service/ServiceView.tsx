@@ -19,7 +19,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { Service, ServiceDetail, ServiceItem } from '@shared/types';
 import { api } from '../../api/client';
 import { usePlayer } from '../player/PlayerProvider';
-import { formatDuration, trackReference } from '../../lib/format';
+import { formatDuration, hymnReference } from '../../lib/format';
 
 interface Props {
   services: Service[];
@@ -58,11 +58,15 @@ function SortableRow({
       <div className="service-item__body">
         <span className="muted small">{item.label ?? item.kind}</span>
         <strong>
-          {item.track ? (item.track.hymnTitle ?? item.track.originalFilename) : item.label ?? '—'}
+          {item.hymn?.title ?? item.track?.originalFilename ?? item.label ?? '—'}
         </strong>
         <span className="muted small">
           {item.track
-            ? [trackReference(item.track), item.track.tuneName, item.verses && `vv. ${item.verses}`]
+            ? [
+                item.hymn ? hymnReference(item.hymn) : 'Unfiled',
+                item.track.tuneName,
+                item.verses && `vv. ${item.verses}`,
+              ]
                 .filter(Boolean)
                 .join(' · ')
             : 'No audio'}

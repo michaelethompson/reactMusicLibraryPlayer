@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Service, ServiceDetail, Track } from '@shared/types';
+import type { LibraryEntry, Service, ServiceDetail } from '@shared/types';
 import { api } from './api/client';
 import { LibraryView } from './features/library/LibraryView';
 import { ServiceView } from './features/service/ServiceView';
@@ -29,15 +29,16 @@ export function App() {
     setService(detail);
   }, []);
 
-  const addTrack = useCallback(
-    async (track: Track) => {
-      if (!service) return;
+  const addEntry = useCallback(
+    async (entry: LibraryEntry) => {
+      if (!service || !entry.track) return;
       try {
         setService(
           await api.addItem(service.id, {
             kind: 'hymn',
-            trackId: track.id,
-            verses: track.verses ?? undefined,
+            trackId: entry.track.id,
+            hymnId: entry.hymn?.id,
+            verses: entry.track.verses ?? undefined,
           }),
         );
       } catch (err) {
@@ -55,7 +56,7 @@ export function App() {
       </header>
 
       <main className="app__main">
-        <LibraryView onAddTrack={(track) => void addTrack(track)} canAdd={service !== null} />
+        <LibraryView onAddEntry={(entry) => void addEntry(entry)} canAdd={service !== null} />
         <ServiceView
           services={services}
           service={service}

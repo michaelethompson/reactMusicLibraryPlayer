@@ -1,4 +1,4 @@
-import type { Track } from '@shared/types';
+import type { HymnSummary, Track } from '@shared/types';
 
 export function formatDuration(ms: number | null | undefined): string {
   if (!ms || !Number.isFinite(ms) || ms < 0) return '–:––';
@@ -8,8 +8,12 @@ export function formatDuration(ms: number | null | undefined): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
-export function trackReference(track: Track): string {
-  return [track.hymnalCode, track.hymnNumber].filter(Boolean).join(' ') || 'Unfiled';
+export function hymnReference(hymn: HymnSummary | null | undefined): string {
+  return hymn ? `${hymn.hymnalCode} ${hymn.numberRaw}` : 'Unfiled';
+}
+
+export function trackLabel(track: Track, hymn?: HymnSummary | null): string {
+  return hymn?.title ?? track.originalFilename ?? `Recording ${track.id}`;
 }
 
 export function copyrightLine(track: Track): string {

@@ -42,12 +42,14 @@ export interface Hymn extends HymnSummary {
   primaryTuneId: number | null;
   primaryTuneName: string | null;
   altTunes: Tune[];
-  trackCount: number;
+  /** Every recording this hymn may be sung to; the playlist picks one of these. */
+  tracks: Track[];
 }
 
 /**
- * A single audio recording. Recordings are shared: one file of a common-meter
- * tune may serve any number of hymn texts, so the hymn link lives in a join.
+ * A single audio recording, identified by its tune, tempo, key and verse count.
+ * Recordings are shared: one file of a common-meter tune may serve any number of
+ * hymn texts, so the hymn link lives in a join.
  */
 export interface Track {
   id: number;
@@ -57,26 +59,20 @@ export interface Track {
   mime: string;
   durationMs: number | null;
   bitrate: number | null;
-  arrangement: string | null;
-  verses: string | null;
   ingestedAt: string;
 
-  /** The tune this particular recording is sung to. */
   tuneId: number | null;
   tuneName: string | null;
   tuneMeter: string | null;
   tuneComposer: string | null;
+  tempoBpm: number | null;
+  musicKey: string | null;
+  verseCount: number | null;
+  arrangement: string | null;
 
   copyright: Copyright | null;
   /** Every hymn this recording is filed under. */
   hymns: HymnSummary[];
-}
-
-/** One row of the library browser: a recording seen through one hymn, or unfiled. */
-export interface LibraryEntry {
-  id: string;
-  hymn: Hymn | null;
-  track: Track;
 }
 
 export type ServiceItemKind = 'hymn' | 'spoken' | 'silence' | 'note';
@@ -86,15 +82,15 @@ export interface ServiceItem {
   serviceId: number;
   position: number;
   kind: ServiceItemKind;
-  trackId: number | null;
-  /** Which hymn this recording is being used as, since a file may serve several. */
+  /** The hymn is what the item *is*; the recording is only how it will be played. */
   hymnId: number | null;
+  trackId: number | null;
+  /** Freeform heading, e.g. "Opening Hymn" or "Distribution". */
   label: string | null;
-  verses: string | null;
   gapAfterMs: number;
   autoAdvance: boolean;
+  hymn: Hymn | null;
   track: Track | null;
-  hymn: HymnSummary | null;
 }
 
 export interface Service {
@@ -128,8 +124,6 @@ export interface LibraryQuery {
   q?: string;
   hymnal?: string;
   tune?: string;
-  /** Only recordings that are not filed under any hymn yet. */
-  unfiled?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -152,9 +146,11 @@ export interface HymnInput {
 }
 
 export interface TrackInput {
-  arrangement?: string | null;
-  verses?: string | null;
   tuneName?: string | null;
+  tempoBpm?: number | null;
+  musicKey?: string | null;
+  verseCount?: number | null;
+  arrangement?: string | null;
 }
 
 /**
@@ -173,6 +169,9 @@ export const TAG_FRAMES = {
   textAuthor: 'TXXX:TEXT_AUTHOR',
   firstLine: 'TXXX:FIRST_LINE',
   arrangement: 'TXXX:ARRANGEMENT',
+  tempo: 'TXXX:TEMPO',
+  musicKey: 'TXXX:KEY',
+  verseCount: 'TXXX:VERSE_COUNT',
   verses: 'TXXX:VERSES',
   ccli: 'TXXX:CCLI',
   publicDomain: 'TXXX:PD',

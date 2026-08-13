@@ -1,18 +1,29 @@
 import type {
+  Hymn,
   Hymnal,
+  HymnInput,
+  HymnalInput,
   IngestResult,
+  LibraryEntry,
   Service,
   ServiceDetail,
   ServiceItemKind,
   Track,
+  TrackInput,
   Tune,
 } from '@shared/types';
 
+export type ManagedHymnal = Hymnal & { hymnCount: number; aliases: string[] };
+export type HymnDetail = Hymn & { tracks: Track[] };
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: init?.body instanceof FormData ? init.headers : { 'Content-Type': 'application/json', ...init?.headers },
-  });
+  const headers = new Headers(init?.headers);
+  // Fastify rejects a JSON content-type with an empty body, so only set it when sending one.
+  if (init?.body !== undefined && !(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const response = await fetch(url, { ...init, headers });
   if (!response.ok) {
     const detail = await response.json().catch(() => ({}));
     throw new Error((detail as { error?: string }).error ?? `Request failed: ${response.status}`);
@@ -21,14 +32,57 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  tracks(params: { q?: string; hymnal?: string; tune?: string } = {}) {
+  entries(params: { q?: string; hymnal?: string; tune?: string; unfiled?: boolean } = {}) {
     const search = new URLSearchParams(
-      Object.entries(params).filter(([, value]) => value) as [string, string][],
+      Object.entries(params)
+        .filter(([, value]) => value !== undefined && value !== '' && value !== false)
+        .map(([key, value]) => [key, String(value)]),
     );
-    return request<Track[]>(`/api/library/tracks?${search}`);
+    return request<LibraryEntry[]>(`/api/library/entries?${search}`);
   },
 
-  hymnals: () => request<Hymnal[]>('/api/library/hymnals'),
+  tracks: () => request<Track[]>('/api/library/tracks'),
+  updateTrack: (id: number, patch: TrackInput) =>
+    request<Track>(`/api/library/tracks/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteTrack: (id: number) => request<void>(`/api/library/tracks/${id}`, { method: 'DELETE' }),
+
+  hymnals: () => request<ManagedHymnal[]>('/api/library/hymnals'),
+  createHymnal: (input: HymnalInput) =>
+    request<ManagedHymnal[]>('/api/library/hymnals', { method: 'POST', body: JSON.stringify(input) }),
+  updateHymnal: (id: number, patch: Partial<HymnalInput>) =>
+    request<ManagedHymnal[]>(`/api/library/hymnals/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  deleteHymnal: (id: number) =>
+    request<ManagedHymnal[]>(`/api/library/hymnals/${id}`, { method: 'DELETE' }),
+  addAlias: (id: number, alias: string) =>
+    request<ManagedHymnal[]>(`/api/library/hymnals/${id}/aliases`, {
+      method: 'POST',
+      body: JSON.stringify({ alias }),
+    }),
+  removeAlias: (id: number, alias: string) =>
+    request<ManagedHymnal[]>(
+      `/api/library/hymnals/${id}/aliases/${encodeURIComponent(alias)}`,
+      { method: 'DELETE' },
+    ),
+
+  hymns: (hymnal?: string) =>
+    request<Hymn[]>(`/api/library/hymns${hymnal ? `?hymnal=${encodeURIComponent(hymnal)}` : ''}`),
+  hymn: (id: number) => request<HymnDetail>(`/api/library/hymns/${id}`),
+  createHymn: (input: HymnInput) =>
+    request<Hymn>('/api/library/hymns', { method: 'POST', body: JSON.stringify(input) }),
+  updateHymn: (id: number, patch: Partial<HymnInput>) =>
+    request<Hymn>(`/api/library/hymns/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteHymn: (id: number) => request<void>(`/api/library/hymns/${id}`, { method: 'DELETE' }),
+  linkTrack: (hymnId: number, trackId: number) =>
+    request<HymnDetail>(`/api/library/hymns/${hymnId}/tracks`, {
+      method: 'POST',
+      body: JSON.stringify({ trackId }),
+    }),
+  unlinkTrack: (hymnId: number, trackId: number) =>
+    request<HymnDetail>(`/api/library/hymns/${hymnId}/tracks/${trackId}`, { method: 'DELETE' }),
+
   tunes: () => request<Tune[]>('/api/library/tunes'),
 
   upload(files: File[]) {
@@ -51,7 +105,13 @@ export const api = {
 
   addItem: (
     serviceId: number,
-    item: { kind: ServiceItemKind; trackId?: number; label?: string; verses?: string },
+    item: {
+      kind: ServiceItemKind;
+      trackId?: number;
+      hymnId?: number;
+      label?: string;
+      verses?: string;
+    },
   ) =>
     request<ServiceDetail>(`/api/services/${serviceId}/items`, {
       method: 'POST',

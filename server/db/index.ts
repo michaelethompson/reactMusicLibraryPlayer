@@ -42,6 +42,30 @@ function migrate(): void {
       WHERE track_id IS NOT NULL
     `);
   }
+
+  // Recordings are now identified by tune, tempo, key and verse count.
+  for (const [column, definition] of [
+    ['tempo_bpm', 'INTEGER'],
+    ['music_key', 'TEXT'],
+    ['verse_count', 'INTEGER'],
+  ] as const) {
+    if (!hasColumn('tracks', column)) {
+      db.exec(`ALTER TABLE tracks ADD COLUMN ${column} ${definition}`);
+    }
+  }
+
+  if (hasColumn('tracks', 'verses')) {
+    db.exec(`
+      UPDATE tracks
+      SET verse_count = LENGTH(verses) - LENGTH(REPLACE(verses, ',', '')) + 1
+      WHERE verse_count IS NULL AND verses IS NOT NULL AND verses != ''
+    `);
+    db.exec('ALTER TABLE tracks DROP COLUMN verses');
+  }
+
+  if (hasColumn('service_items', 'verses')) {
+    db.exec('ALTER TABLE service_items DROP COLUMN verses');
+  }
 }
 
 migrate();

@@ -83,6 +83,13 @@ export function linkTrack(hymnId: number, trackId: number): void {
     trackId,
     Number(next.next),
   );
+
+  // An untagged recording filed under a hymn is presumed to be that hymn's tune.
+  db.prepare(`
+    UPDATE tracks
+    SET tune_id = (SELECT primary_tune_id FROM hymns WHERE id = ?)
+    WHERE id = ? AND tune_id IS NULL
+  `).run(hymnId, trackId);
 }
 
 export function unlinkTrack(hymnId: number, trackId: number): number {
