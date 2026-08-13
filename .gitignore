@@ -1,0 +1,11 @@
+node_modules
+dist
+*.local
+.DS_Store
+
+# Ingested audio and database are local data, not source
+server/media/
+server/db/*.db
+server/db/*.db-journal
+server/db/*.db-wal
+server/db/*.db-shm
