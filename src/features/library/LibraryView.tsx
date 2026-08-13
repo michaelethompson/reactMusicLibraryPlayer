@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { LibraryEntry, Track, Tune } from '@shared/types';
+import type { Hymn, Track, Tune } from '@shared/types';
 import { api, type ManagedHymnal } from '../../api/client';
 import { usePlayer } from '../player/PlayerProvider';
-import { copyrightLine, formatDuration, hymnReference } from '../../lib/format';
+import { copyrightLine, formatDuration, hymnReference, recordingLabel } from '../../lib/format';
 import { HymnalManager } from './HymnalManager';
 import { HymnEditor } from './HymnEditor';
+import { RecordingReview } from './RecordingReview';
 
 interface Props {
-  onAddEntry: (entry: LibraryEntry) => void;
+  onAddHymn: (hymn: Hymn) => void;
   canAdd: boolean;
 }
 
@@ -16,33 +17,37 @@ interface EditorTarget {
   track: Track | null;
 }
 
-export function LibraryView({ onAddEntry, canAdd }: Props) {
+export function LibraryView({ onAddHymn, canAdd }: Props) {
   const { playTrack, currentTrack } = usePlayer();
   const fileInput = useRef<HTMLInputElement | null>(null);
 
-  const [entries, setEntries] = useState<LibraryEntry[]>([]);
+  const [hymns, setHymns] = useState<Hymn[]>([]);
+  const [unfiled, setUnfiled] = useState<Track[]>([]);
   const [hymnals, setHymnals] = useState<ManagedHymnal[]>([]);
   const [tunes, setTunes] = useState<Tune[]>([]);
   const [query, setQuery] = useState('');
   const [hymnal, setHymnal] = useState('');
   const [tune, setTune] = useState('');
-  const [unfiled, setUnfiled] = useState(false);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showHymnals, setShowHymnals] = useState(false);
   const [editor, setEditor] = useState<EditorTarget | null>(null);
+  const [review, setReview] = useState<Track[] | null>(null);
 
-  const filters = useMemo(() => ({ q: query, hymnal, tune, unfiled }), [query, hymnal, tune, unfiled]);
+  const filters = useMemo(() => ({ q: query, hymnal, tune }), [query, hymnal, tune]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [nextEntries, nextHymnals, nextTunes] = await Promise.all([
-        api.entries(filters),
+      const [nextHymns, nextUnfiled, nextHymnals, nextTunes] = await Promise.all([
+        api.hymns(filters),
+        api.unfiled(),
         api.hymnals(),
         api.tunes(),
       ]);
-      setEntries(nextEntries);
+      setHymns(nextHymns);
+      setUnfiled(nextUnfiled);
       setHymnals(nextHymnals);
       setTunes(nextTunes);
     } catch (error) {
@@ -57,26 +62,31 @@ export function LibraryView({ onAddEntry, canAdd }: Props) {
     return () => window.clearTimeout(timer);
   }, [refresh, query]);
 
+  function toggle(hymnId: number) {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (!next.delete(hymnId)) next.add(hymnId);
+      return next;
+    });
+  }
+
   async function handleUpload(files: FileList | null) {
     if (!files || files.length === 0) return;
     setStatus('Reading tags…');
     try {
       const { results, rejected } = await api.upload(Array.from(files));
-      const duplicates = results.filter((result) => result.duplicate).length;
-      const problems = results
-        .flatMap((result) => result.issues)
-        .filter((issue) => issue.severity === 'error');
       setStatus(
         [
-          `${results.length - duplicates} added`,
-          duplicates > 0 && `${duplicates} already on disk`,
-          problems.length > 0 && `${problems.length} need filing`,
+          `${results.filter((r) => !r.duplicate).length} added`,
+          results.some((r) => r.duplicate) && `${results.filter((r) => r.duplicate).length} already on disk`,
           rejected.length > 0 && `${rejected.length} rejected`,
         ]
           .filter(Boolean)
           .join(' · '),
       );
       await refresh();
+      // Every new file gets its tune, tempo, key and verse count confirmed.
+      if (results.length > 0) setReview(results.map((result) => result.track));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Upload failed');
     } finally {
@@ -145,89 +155,62 @@ export function LibraryView({ onAddEntry, canAdd }: Props) {
             </option>
           ))}
         </select>
-        <label className="auto">
-          <input
-            type="checkbox"
-            checked={unfiled}
-            onChange={(event) => setUnfiled(event.target.checked)}
-          />
-          unfiled only
-        </label>
       </div>
 
       {status && <p className="status">{status}</p>}
 
       <ul className="track-list">
-        {entries.map((entry) => {
-          const { hymn, track } = entry;
+        {hymns.map((hymn) => {
+          const isOpen = expanded.has(hymn.id);
           return (
-            <li
-              key={entry.id}
-              className={track && track.id === currentTrack?.id ? 'track is-current' : 'track'}
-            >
+            <li key={hymn.id} className="track">
               <div className="track__ref mono">{hymnReference(hymn)}</div>
               <div className="track__body">
-                <strong>{hymn?.title ?? track?.originalFilename}</strong>
+                <strong>{hymn.title}</strong>
                 <span className="muted">
                   {[
-                    track?.tuneName ?? hymn?.primaryTuneName,
-                    track?.tuneMeter,
-                    track?.arrangement,
-                    hymn && hymn.altTunes.length > 0 &&
+                    hymn.primaryTuneName,
+                    hymn.altTunes.length > 0 &&
                       `alt: ${hymn.altTunes.map((t) => t.name).join(', ')}`,
                   ]
                     .filter(Boolean)
-                    .join(' · ')}
+                    .join(' · ') || <span className="muted">No tune named</span>}
                 </span>
-                <span className="muted small">
-                  {track ? copyrightLine(track) : 'No recording yet'}
-                  {track && track.hymns.length > 1 && (
-                    <span
-                      className="chip chip--info"
-                      title={track.hymns.map((h) => `${h.hymnalCode} ${h.numberRaw}`).join(', ')}
-                    >
-                      shared by {track.hymns.length} hymns
-                    </span>
-                  )}
-                </span>
+                {hymn.tracks.length === 0 ? (
+                  <span className="warn small">⚠ No linked recording</span>
+                ) : (
+                  <button type="button" className="linkish small" onClick={() => toggle(hymn.id)}>
+                    {isOpen ? '▾' : '▸'} {hymn.tracks.length} recording
+                    {hymn.tracks.length === 1 ? '' : 's'}
+                  </button>
+                )}
+
+                {isOpen && (
+                  <ul className="recording-list">
+                    {hymn.tracks.map((track) => (
+                      <li key={track.id}>
+                        <button
+                          type="button"
+                          onClick={() => playTrack(track)}
+                          aria-label="Preview recording"
+                          className={track.id === currentTrack?.id ? 'is-current' : undefined}
+                        >
+                          ▶
+                        </button>
+                        <span className="mono">{recordingLabel(track)}</span>
+                        <span className="mono muted">{formatDuration(track.durationMs)}</span>
+                        <span className="muted small">{copyrightLine(track)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <div className="track__actions">
-                <span className="mono muted">{formatDuration(track?.durationMs)}</span>
-                <button
-                  type="button"
-                  onClick={() => track && playTrack(track)}
-                  disabled={!track}
-                  aria-label="Preview"
-                >
-                  ▶
+                <button type="button" onClick={() => setEditor({ hymnId: hymn.id, track: null })}>
+                  Edit
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setEditor({ hymnId: hymn?.id ?? null, track })}
-                  title={hymn ? 'Edit hymn details' : 'File this recording under a hymn'}
-                >
-                  {hymn ? 'Edit' : 'File…'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onAddEntry(entry)}
-                  disabled={!canAdd || !hymn || !track}
-                >
+                <button type="button" onClick={() => onAddHymn(hymn)} disabled={!canAdd}>
                   Add
-                </button>
-                <button
-                  type="button"
-                  className="danger"
-                  disabled={!track || track.hymns.length > 0}
-                  aria-label="Delete recording"
-                  title={
-                    track && track.hymns.length > 0
-                      ? 'Unlink it from every hymn before deleting the audio'
-                      : 'Delete this audio file'
-                  }
-                  onClick={() => track && void deleteTrack(track)}
-                >
-                  ✕
                 </button>
               </div>
             </li>
@@ -235,11 +218,47 @@ export function LibraryView({ onAddEntry, canAdd }: Props) {
         })}
       </ul>
 
-      {!loading && entries.length === 0 && (
+      {!loading && hymns.length === 0 && (
         <p className="empty">
-          Nothing here. Add tagged audio files and they will be filed by their HYMNAL and
-          HYMN_NUMBER frames; anything untagged lands under “unfiled”.
+          No hymns match. Add tagged audio and it will be filed by its HYMNAL and HYMN_NUMBER
+          frames, or create a hymn and link a recording to it.
         </p>
+      )}
+
+      {unfiled.length > 0 && (
+        <>
+          <h3 className="section-heading">Unfiled recordings ({unfiled.length})</h3>
+          <ul className="track-list track-list--short">
+            {unfiled.map((track) => (
+              <li key={track.id} className={track.id === currentTrack?.id ? 'track is-current' : 'track'}>
+                <div className="track__body">
+                  <strong className="small">{track.originalFilename}</strong>
+                  <span className="muted small">{recordingLabel(track)}</span>
+                </div>
+                <div className="track__actions">
+                  <span className="mono muted">{formatDuration(track.durationMs)}</span>
+                  <button type="button" onClick={() => playTrack(track)} aria-label="Preview">
+                    ▶
+                  </button>
+                  <button type="button" onClick={() => setReview([track])}>
+                    Details
+                  </button>
+                  <button type="button" onClick={() => setEditor({ hymnId: null, track })}>
+                    File…
+                  </button>
+                  <button
+                    type="button"
+                    className="danger"
+                    aria-label="Delete recording"
+                    onClick={() => void deleteTrack(track)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       {showHymnals && (
@@ -259,6 +278,15 @@ export function LibraryView({ onAddEntry, canAdd }: Props) {
           hymnals={hymnals}
           initialTrack={editor.track}
           onClose={() => setEditor(null)}
+          onSaved={() => void refresh()}
+        />
+      )}
+
+      {review && (
+        <RecordingReview
+          tracks={review}
+          tuneNames={tunes.map((item) => item.name)}
+          onClose={() => setReview(null)}
           onSaved={() => void refresh()}
         />
       )}

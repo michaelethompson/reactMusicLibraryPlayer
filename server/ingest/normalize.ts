@@ -57,6 +57,16 @@ export function parseYear(value: unknown): number | null {
   return match ? Number.parseInt(match[1], 10) : null;
 }
 
+/** First positive integer in the value, e.g. "96 bpm" or "4 verses". */
+export function parseCount(value: unknown): number | null {
+  const text = clean(value);
+  if (!text) return null;
+  const match = text.match(/\d+/);
+  if (!match) return null;
+  const count = Number.parseInt(match[0], 10);
+  return count > 0 ? count : null;
+}
+
 export function parseBoolean(value: unknown): boolean {
   const text = clean(value)?.toLowerCase();
   if (!text) return false;

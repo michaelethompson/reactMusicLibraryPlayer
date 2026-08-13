@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { LibraryEntry, Service, ServiceDetail } from '@shared/types';
+import type { Hymn, Service, ServiceDetail } from '@shared/types';
 import { api } from './api/client';
 import { LibraryView } from './features/library/LibraryView';
 import { ServiceView } from './features/service/ServiceView';
@@ -29,18 +29,19 @@ export function App() {
     setService(detail);
   }, []);
 
-  const addEntry = useCallback(
-    async (entry: LibraryEntry) => {
-      if (!service || !entry.track) return;
+  const addHymn = useCallback(
+    async (hymn: Hymn) => {
+      if (!service) return;
+      if (
+        hymn.tracks.length === 0 &&
+        !window.confirm(
+          `${hymn.hymnalCode} ${hymn.numberRaw} “${hymn.title}” has no linked recording, so nothing will play for it.\n\nAdd it to the service anyway?`,
+        )
+      ) {
+        return;
+      }
       try {
-        setService(
-          await api.addItem(service.id, {
-            kind: 'hymn',
-            trackId: entry.track.id,
-            hymnId: entry.hymn?.id,
-            verses: entry.track.verses ?? undefined,
-          }),
-        );
+        setService(await api.addItem(service.id, { kind: 'hymn', hymnId: hymn.id }));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not add item');
       }
@@ -56,7 +57,7 @@ export function App() {
       </header>
 
       <main className="app__main">
-        <LibraryView onAddEntry={(entry) => void addEntry(entry)} canAdd={service !== null} />
+        <LibraryView onAddHymn={(hymn) => void addHymn(hymn)} canAdd={service !== null} />
         <ServiceView
           services={services}
           service={service}

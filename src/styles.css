@@ -50,7 +50,7 @@ body {
   background: var(--panel);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
   padding: 16px;
   gap: 12px;
 }
@@ -103,9 +103,52 @@ button.danger:hover { border-color: var(--danger); color: var(--danger); }
 }
 
 .track__ref { min-width: 78px; color: var(--muted); }
-.track__body, .service-item__body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.track__body, .service-item__body { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 2px; }
 .track__body > *, .service-item__body > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .track__actions, .service-item__actions { display: flex; align-items: center; gap: 6px; }
+
+.track-list--short { flex: 0 0 auto; max-height: 30vh; }
+
+.section-heading {
+  margin: 6px 0 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.warn { color: #e0af68; }
+
+.linkish {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  text-align: left;
+  width: fit-content;
+}
+
+.recording-list { list-style: none; margin: 4px 0 2px; padding: 0 0 0 4px; display: flex; flex-direction: column; gap: 3px; }
+.recording-list li { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.recording-list button { padding: 0 6px; font-size: 11px; }
+.recording-list button.is-current { border-color: var(--accent); color: var(--accent); }
+
+.item-label {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  width: 100%;
+}
+
+.item-label:hover { border-color: var(--line); }
+.item-label:focus { border-color: var(--accent); color: var(--text); outline: none; }
+
+.tune-picker { margin-top: 4px; padding: 3px 6px; font-size: 12px; max-width: 100%; }
 
 .grip { cursor: grab; background: none; border: none; color: var(--muted); padding: 4px 6px; }
 .grip:active { cursor: grabbing; }
@@ -203,3 +246,96 @@ button.danger:hover { border-color: var(--danger); color: var(--danger); }
 .link-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .link-list li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
 .link-list li > .muted:nth-child(2) { flex: 1; }
+
+/* --- service view -------------------------------------------------------- */
+
+.button-link {
+  display: inline-block;
+  background: #22262e;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.button-link:hover { border-color: var(--accent); }
+
+.perform {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.perform--picker { grid-template-rows: auto 1fr; }
+
+.perform__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.perform__header h1 { margin: 0; font-size: 22px; }
+
+.perform-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.perform-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.perform-item:disabled { opacity: 0.55; cursor: default; }
+
+.perform-item.is-current {
+  border-color: var(--accent);
+  background: rgba(122, 162, 247, 0.14);
+}
+
+.perform-item__index {
+  min-width: 32px;
+  font-size: 20px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.perform-item.is-current .perform-item__index { color: var(--accent); }
+
+.perform-item__main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+
+.perform-item__label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.perform-item__title { font-size: 21px; font-weight: 600; }
+.perform-item__meta { display: flex; gap: 12px; font-size: 14px; color: var(--muted); }
+.perform-item__time { font-size: 16px; color: var(--muted); }
+
+/* The transport needs to be readable from the console, not the desk. */
+.perform .player-bar { padding: 16px 20px; }
+.perform .player-bar__transport button { min-width: 64px; font-size: 18px; padding: 10px; }
+.perform .player-bar__now strong { font-size: 18px; }

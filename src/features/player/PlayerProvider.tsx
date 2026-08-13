@@ -49,6 +49,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const currentItem = currentIndex >= 0 ? (queue[currentIndex] ?? null) : null;
   const currentTrack = previewTrack ?? currentItem?.track ?? null;
 
+  const currentItemIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    currentItemIdRef.current = currentItem?.id ?? null;
+  }, [currentItem]);
+
   const clearAdvanceTimer = useCallback(() => {
     if (advanceTimer.current !== null) {
       window.clearTimeout(advanceTimer.current);
@@ -67,6 +72,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         audio.removeAttribute('src');
         audio.load();
         setIsPlaying(false);
+        setCurrentTime(0);
+        setDuration(0);
         return;
       }
 
@@ -137,10 +144,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (audio && Number.isFinite(audio.duration)) audio.currentTime = seconds;
   }, []);
 
-  const setQueue = useCallback((items: ServiceItem[]) => {
-    setQueueState(items);
-    setCurrentIndex((index) => (index >= items.length ? -1 : index));
-  }, []);
+  const setQueue = useCallback(
+    (items: ServiceItem[]) => {
+      setQueueState(items);
+
+      // Follow the playing item by id so a reorder does not leave the index
+      // pointing at a different hymn.
+      const playingId = currentItemIdRef.current;
+      if (playingId === null) return;
+      const next = items.findIndex((item) => item.id === playingId);
+      setCurrentIndex(next);
+      if (next === -1) load(null, false);
+    },
+    [load],
+  );
 
   useEffect(() => {
     const audio = audioRef.current;

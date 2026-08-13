@@ -4,7 +4,6 @@ import type {
   HymnInput,
   HymnalInput,
   IngestResult,
-  LibraryEntry,
   Service,
   ServiceDetail,
   ServiceItemKind,
@@ -14,7 +13,6 @@ import type {
 } from '@shared/types';
 
 export type ManagedHymnal = Hymnal & { hymnCount: number; aliases: string[] };
-export type HymnDetail = Hymn & { tracks: Track[] };
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -32,14 +30,14 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  entries(params: { q?: string; hymnal?: string; tune?: string; unfiled?: boolean } = {}) {
+  hymns(params: { q?: string; hymnal?: string; tune?: string } = {}) {
     const search = new URLSearchParams(
-      Object.entries(params)
-        .filter(([, value]) => value !== undefined && value !== '' && value !== false)
-        .map(([key, value]) => [key, String(value)]),
+      Object.entries(params).filter(([, value]) => value) as [string, string][],
     );
-    return request<LibraryEntry[]>(`/api/library/entries?${search}`);
+    return request<Hymn[]>(`/api/library/hymns?${search}`);
   },
+
+  unfiled: () => request<Track[]>('/api/library/unfiled'),
 
   tracks: () => request<Track[]>('/api/library/tracks'),
   updateTrack: (id: number, patch: TrackInput) =>
@@ -67,21 +65,19 @@ export const api = {
       { method: 'DELETE' },
     ),
 
-  hymns: (hymnal?: string) =>
-    request<Hymn[]>(`/api/library/hymns${hymnal ? `?hymnal=${encodeURIComponent(hymnal)}` : ''}`),
-  hymn: (id: number) => request<HymnDetail>(`/api/library/hymns/${id}`),
+  hymn: (id: number) => request<Hymn>(`/api/library/hymns/${id}`),
   createHymn: (input: HymnInput) =>
     request<Hymn>('/api/library/hymns', { method: 'POST', body: JSON.stringify(input) }),
   updateHymn: (id: number, patch: Partial<HymnInput>) =>
     request<Hymn>(`/api/library/hymns/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteHymn: (id: number) => request<void>(`/api/library/hymns/${id}`, { method: 'DELETE' }),
   linkTrack: (hymnId: number, trackId: number) =>
-    request<HymnDetail>(`/api/library/hymns/${hymnId}/tracks`, {
+    request<Hymn>(`/api/library/hymns/${hymnId}/tracks`, {
       method: 'POST',
       body: JSON.stringify({ trackId }),
     }),
   unlinkTrack: (hymnId: number, trackId: number) =>
-    request<HymnDetail>(`/api/library/hymns/${hymnId}/tracks/${trackId}`, { method: 'DELETE' }),
+    request<Hymn>(`/api/library/hymns/${hymnId}/tracks/${trackId}`, { method: 'DELETE' }),
 
   tunes: () => request<Tune[]>('/api/library/tunes'),
 
@@ -107,10 +103,9 @@ export const api = {
     serviceId: number,
     item: {
       kind: ServiceItemKind;
-      trackId?: number;
       hymnId?: number;
+      trackId?: number | null;
       label?: string;
-      verses?: string;
     },
   ) =>
     request<ServiceDetail>(`/api/services/${serviceId}/items`, {
@@ -121,7 +116,12 @@ export const api = {
   updateItem: (
     serviceId: number,
     itemId: number,
-    patch: { label?: string; verses?: string; autoAdvance?: boolean; gapAfterMs?: number },
+    patch: {
+      label?: string | null;
+      trackId?: number | null;
+      autoAdvance?: boolean;
+      gapAfterMs?: number;
+    },
   ) =>
     request<ServiceDetail>(`/api/services/${serviceId}/items/${itemId}`, {
       method: 'PATCH',

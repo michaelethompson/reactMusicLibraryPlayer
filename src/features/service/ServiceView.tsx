@@ -19,7 +19,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { Service, ServiceDetail, ServiceItem } from '@shared/types';
 import { api } from '../../api/client';
 import { usePlayer } from '../player/PlayerProvider';
-import { formatDuration, hymnReference } from '../../lib/format';
+import { formatDuration, hymnReference, recordingLabel } from '../../lib/format';
 
 interface Props {
   services: Service[];
@@ -32,11 +32,15 @@ interface Props {
 function SortableRow({
   item,
   index,
+  onLabel,
+  onPickTrack,
   onRemove,
   onToggleAuto,
 }: {
   item: ServiceItem;
   index: number;
+  onLabel: (label: string) => void;
+  onPickTrack: (trackId: number | null) => void;
   onRemove: () => void;
   onToggleAuto: () => void;
 }) {
@@ -44,7 +48,9 @@ function SortableRow({
     id: item.id,
   });
   const { playIndex, currentItem, isPlaying } = usePlayer();
+  const [label, setLabel] = useState(item.label ?? '');
   const isCurrent = currentItem?.id === item.id;
+  const recordings = item.hymn?.tracks ?? [];
 
   return (
     <li
@@ -55,23 +61,42 @@ function SortableRow({
       <button type="button" className="grip" {...attributes} {...listeners} aria-label="Reorder">
         ⠿
       </button>
+
       <div className="service-item__body">
-        <span className="muted small">{item.label ?? item.kind}</span>
-        <strong>
-          {item.hymn?.title ?? item.track?.originalFilename ?? item.label ?? '—'}
-        </strong>
-        <span className="muted small">
-          {item.track
-            ? [
-                item.hymn ? hymnReference(item.hymn) : 'Unfiled',
-                item.track.tuneName,
-                item.verses && `vv. ${item.verses}`,
-              ]
-                .filter(Boolean)
-                .join(' · ')
-            : 'No audio'}
-        </span>
+        <input
+          className="item-label"
+          placeholder="Opening Hymn"
+          aria-label="Item heading"
+          value={label}
+          onChange={(event) => setLabel(event.target.value)}
+          onBlur={() => label !== (item.label ?? '') && onLabel(label)}
+          onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()}
+        />
+        <strong>{item.hymn?.title ?? item.track?.originalFilename ?? '—'}</strong>
+        <span className="muted small">{item.hymn ? hymnReference(item.hymn) : 'No hymn'}</span>
+
+        {item.hymn &&
+          (recordings.length === 0 ? (
+            <span className="warn small">⚠ No recording linked to this hymn</span>
+          ) : (
+            <select
+              className="tune-picker"
+              aria-label="Tune"
+              value={item.trackId ?? ''}
+              onChange={(event) =>
+                onPickTrack(event.target.value ? Number(event.target.value) : null)
+              }
+            >
+              <option value="">Choose a tune…</option>
+              {recordings.map((track) => (
+                <option key={track.id} value={track.id}>
+                  {recordingLabel(track)}
+                </option>
+              ))}
+            </select>
+          ))}
       </div>
+
       <div className="service-item__actions">
         <span className="mono muted">{formatDuration(item.track?.durationMs)}</span>
         <label className="auto" title="Automatically start the next item when this one ends">
@@ -128,6 +153,17 @@ export function ServiceView({ services, service, onSelect, onCreated, onChanged 
             </option>
           ))}
         </select>
+        {service && (
+          <a
+            className="button-link"
+            href={`#/perform/${service.id}`}
+            target="_blank"
+            rel="noreferrer"
+            title="Open the read-only running order, e.g. on the console screen"
+          >
+            Service view ↗
+          </a>
+        )}
       </header>
 
       <div className="filters">
@@ -156,6 +192,12 @@ export function ServiceView({ services, service, onSelect, onCreated, onChanged 
                   key={item.id}
                   item={item}
                   index={index}
+                  onLabel={async (label) =>
+                    onChanged(await api.updateItem(service.id, item.id, { label }))
+                  }
+                  onPickTrack={async (trackId) =>
+                    onChanged(await api.updateItem(service.id, item.id, { trackId }))
+                  }
                   onRemove={async () => onChanged(await api.removeItem(service.id, item.id))}
                   onToggleAuto={async () =>
                     onChanged(

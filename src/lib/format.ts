@@ -12,8 +12,19 @@ export function hymnReference(hymn: HymnSummary | null | undefined): string {
   return hymn ? `${hymn.hymnalCode} ${hymn.numberRaw}` : 'Unfiled';
 }
 
-export function trackLabel(track: Track, hymn?: HymnSummary | null): string {
-  return hymn?.title ?? track.originalFilename ?? `Recording ${track.id}`;
+/** A recording is identified by its tune, tempo, key and verse count. */
+export function recordingLabel(track: Track): string {
+  return (
+    [
+      track.tuneName ?? 'Untitled tune',
+      track.tempoBpm && `${track.tempoBpm} bpm`,
+      track.musicKey,
+      track.verseCount && `${track.verseCount} vv.`,
+      track.arrangement,
+    ]
+      .filter(Boolean)
+      .join(' · ') || (track.originalFilename ?? `Recording ${track.id}`)
+  );
 }
 
 export function copyrightLine(track: Track): string {

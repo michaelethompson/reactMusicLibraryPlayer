@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { HymnInput, Track, Tune } from '@shared/types';
-import { api, type HymnDetail, type ManagedHymnal } from '../../api/client';
+import type { Hymn, HymnInput, Track, Tune } from '@shared/types';
+import { api, type ManagedHymnal } from '../../api/client';
 import { Dialog } from '../../components/Dialog';
-import { formatDuration } from '../../lib/format';
+import { formatDuration, recordingLabel } from '../../lib/format';
 
 interface Props {
   hymnId: number | null;
@@ -27,7 +27,7 @@ const emptyDraft = (hymnalId: number): Draft => ({
 
 export function HymnEditor({ hymnId, hymnals, initialTrack, onClose, onSaved }: Props) {
   const [draft, setDraft] = useState<Draft>(emptyDraft(hymnals[0]?.id ?? 0));
-  const [detail, setDetail] = useState<HymnDetail | null>(null);
+  const [detail, setDetail] = useState<Hymn | null>(null);
   const [allTracks, setAllTracks] = useState<Track[]>([]);
   const [tunes, setTunes] = useState<Tune[]>([]);
   const [pickTrack, setPickTrack] = useState('');
@@ -192,10 +192,8 @@ export function HymnEditor({ hymnId, hymnals, initialTrack, onClose, onSaved }: 
           <ul className="link-list">
             {linked.map((track) => (
               <li key={track.id}>
-                <span className="mono">{track.tuneName ?? '—'}</span>
-                <span className="muted">
-                  {[track.arrangement, track.originalFilename].filter(Boolean).join(' · ')}
-                </span>
+                <span className="mono">{recordingLabel(track)}</span>
+                <span className="muted">{track.originalFilename}</span>
                 <span className="mono muted">{formatDuration(track.durationMs)}</span>
                 <span className="muted small">
                   {track.hymns.length > 1 ? `also under ${track.hymns.length - 1} other` : ''}
@@ -223,9 +221,7 @@ export function HymnEditor({ hymnId, hymnals, initialTrack, onClose, onSaved }: 
               <option value="">Link an existing recording…</option>
               {linkable.map((track) => (
                 <option key={track.id} value={track.id}>
-                  {[track.tuneName, track.arrangement, track.originalFilename]
-                    .filter(Boolean)
-                    .join(' · ')}
+                  {recordingLabel(track)}
                 </option>
               ))}
             </select>

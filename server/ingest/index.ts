@@ -150,8 +150,9 @@ export async function ingestFile(
         .prepare(`
           INSERT INTO tracks
             (sha256, storage_path, original_filename, mime, duration_ms, bitrate,
-             tune_id, copyright_id, arrangement, verses, raw_tags, ingested_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             tune_id, tempo_bpm, music_key, verse_count, arrangement,
+             copyright_id, raw_tags, ingested_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
         .run(
           sha256,
@@ -161,9 +162,11 @@ export async function ingestFile(
           tags.durationMs,
           tags.bitrate,
           tuneId,
-          copyrightId,
+          tags.tempoBpm,
+          tags.musicKey,
+          tags.verseCount,
           tags.arrangement,
-          tags.verses,
+          copyrightId,
           JSON.stringify(tags.raw),
           new Date().toISOString(),
         ),

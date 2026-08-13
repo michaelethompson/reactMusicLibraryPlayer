@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { db } from '../db/index.ts';
-import { getService, listServices } from '../db/queries.ts';
+import { getHymn, getService, listServices } from '../db/queries.ts';
 import type { ServiceItemKind } from '@shared/types';
 
 const KINDS: ServiceItemKind[] = ['hymn', 'spoken', 'silence', 'note'];
@@ -53,31 +53,39 @@ export const serviceRoutes: FastifyPluginAsync = async (app) => {
 
     const body = request.body as {
       kind?: ServiceItemKind;
-      trackId?: number | null;
       hymnId?: number | null;
+      trackId?: number | null;
       label?: string | null;
-      verses?: string | null;
       gapAfterMs?: number;
       autoAdvance?: boolean;
     };
     const kind = body?.kind ?? 'hymn';
     if (!KINDS.includes(kind)) return reply.code(400).send({ error: `kind must be one of ${KINDS.join(', ')}` });
-    if (kind === 'hymn' && !body?.trackId) {
-      return reply.code(400).send({ error: 'trackId is required for hymn items' });
+    if (kind === 'hymn' && !body?.hymnId) {
+      return reply.code(400).send({ error: 'hymnId is required for hymn items' });
+    }
+
+    // A hymn with no chosen recording is allowed; the operator is warned instead.
+    const hymn = body.hymnId ? getHymn(Number(body.hymnId)) : null;
+    if (body.hymnId && !hymn) return reply.code(404).send({ error: 'Hymn not found' });
+
+    const trackId =
+      body.trackId ?? (hymn?.tracks.length === 1 ? hymn.tracks[0].id : null);
+    if (trackId && hymn && !hymn.tracks.some((track) => track.id === trackId)) {
+      return reply.code(400).send({ error: 'That recording is not linked to this hymn' });
     }
 
     db.prepare(`
       INSERT INTO service_items
-        (service_id, position, kind, track_id, hymn_id, label, verses, gap_after_ms, auto_advance)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (service_id, position, kind, hymn_id, track_id, label, gap_after_ms, auto_advance)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       serviceId,
       nextPosition(serviceId),
       kind,
-      body.trackId ?? null,
       body.hymnId ?? null,
+      trackId,
       body.label ?? null,
-      body.verses ?? null,
       body.gapAfterMs ?? 0,
       body.autoAdvance ? 1 : 0,
     );
@@ -90,27 +98,39 @@ export const serviceRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as {
       position?: number;
       label?: string | null;
-      verses?: string | null;
       trackId?: number | null;
       gapAfterMs?: number;
       autoAdvance?: boolean;
     };
 
+    const item = db
+      .prepare('SELECT hymn_id FROM service_items WHERE id = ? AND service_id = ?')
+      .get(Number(itemId), Number(id)) as { hymn_id: number | null } | undefined;
+    if (!item) return reply.code(404).send({ error: 'Item not found' });
+
     const sets: string[] = [];
     const params: Array<string | number | null> = [];
     if (body.position !== undefined) { sets.push('position = ?'); params.push(body.position); }
-    if (body.label !== undefined) { sets.push('label = ?'); params.push(body.label); }
-    if (body.verses !== undefined) { sets.push('verses = ?'); params.push(body.verses); }
-    if (body.trackId !== undefined) { sets.push('track_id = ?'); params.push(body.trackId); }
+    if (body.label !== undefined) { sets.push('label = ?'); params.push(body.label?.trim() || null); }
+    if (body.trackId !== undefined) {
+      // The dropdown may only offer recordings linked to this item's hymn.
+      if (body.trackId !== null && item.hymn_id !== null) {
+        const hymn = getHymn(Number(item.hymn_id));
+        if (!hymn?.tracks.some((track) => track.id === body.trackId)) {
+          return reply.code(400).send({ error: 'That recording is not linked to this hymn' });
+        }
+      }
+      sets.push('track_id = ?');
+      params.push(body.trackId);
+    }
     if (body.gapAfterMs !== undefined) { sets.push('gap_after_ms = ?'); params.push(body.gapAfterMs); }
     if (body.autoAdvance !== undefined) { sets.push('auto_advance = ?'); params.push(body.autoAdvance ? 1 : 0); }
     if (sets.length === 0) return reply.code(400).send({ error: 'No updatable fields supplied' });
 
     params.push(Number(itemId), Number(id));
-    const result = db
-      .prepare(`UPDATE service_items SET ${sets.join(', ')} WHERE id = ? AND service_id = ?`)
-      .run(...params);
-    if (result.changes === 0) return reply.code(404).send({ error: 'Item not found' });
+    db.prepare(`UPDATE service_items SET ${sets.join(', ')} WHERE id = ? AND service_id = ?`).run(
+      ...params,
+    );
 
     return getService(Number(id));
   });

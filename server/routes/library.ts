@@ -5,11 +5,11 @@ import { MEDIA_ROOT, db, reindexHymn, transaction } from '../db/index.ts';
 import {
   getHymn,
   getTrack,
-  listEntries,
   listHymnals,
   listHymns,
   listTracks,
   listTunes,
+  listUnfiledTracks,
   tracksForHymn,
 } from '../db/queries.ts';
 import { lastId, linkTrack, resolveTune, setAltTunes, unlinkTrack } from '../db/resolvers.ts';
@@ -26,20 +26,11 @@ function conflict(reply: FastifyReply, error: unknown, message: string) {
 export const libraryRoutes: FastifyPluginAsync = async (app) => {
   /* ---------------------------------------------------------------- browse */
 
-  app.get('/entries', async (request) => {
-    const q = request.query as Record<string, string | undefined>;
-    return listEntries({
-      q: q.q,
-      hymnal: q.hymnal,
-      tune: q.tune,
-      unfiled: q.unfiled === 'true',
-      limit: Math.min(Number(q.limit ?? 200), 500),
-    });
-  });
+  app.get('/unfiled', async () => listUnfiledTracks());
 
   app.get('/tracks', async (request) => {
     const q = request.query as Record<string, string | undefined>;
-    return listTracks({ q: q.q, tune: q.tune, limit: Math.min(Number(q.limit ?? 200), 500) });
+    return listTracks({ q: q.q, tune: q.tune, limit: Math.min(Number(q.limit ?? 500), 500) });
   });
 
   app.get('/tracks/:id', async (request, reply) => {
@@ -55,13 +46,15 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
     const sets: string[] = [];
     const params: Array<string | number | null> = [];
 
-    if (body.arrangement !== undefined) { sets.push('arrangement = ?'); params.push(clean(body.arrangement)); }
-    if (body.verses !== undefined) { sets.push('verses = ?'); params.push(clean(body.verses)); }
     if (body.tuneName !== undefined) {
       const name = clean(body.tuneName);
       sets.push('tune_id = ?');
       params.push(name ? resolveTune(name) : null);
     }
+    if (body.tempoBpm !== undefined) { sets.push('tempo_bpm = ?'); params.push(body.tempoBpm ?? null); }
+    if (body.musicKey !== undefined) { sets.push('music_key = ?'); params.push(clean(body.musicKey)); }
+    if (body.verseCount !== undefined) { sets.push('verse_count = ?'); params.push(body.verseCount ?? null); }
+    if (body.arrangement !== undefined) { sets.push('arrangement = ?'); params.push(clean(body.arrangement)); }
     if (sets.length === 0) return reply.code(400).send({ error: 'No updatable fields supplied' });
 
     params.push(id);
@@ -196,15 +189,15 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
   /* ---------------------------------------------------------------- hymns */
 
   app.get('/hymns', async (request) => {
-    const { hymnal } = request.query as { hymnal?: string };
-    return listHymns(hymnal);
+    const q = request.query as Record<string, string | undefined>;
+    return listHymns({ q: q.q, hymnal: q.hymnal, tune: q.tune });
   });
 
   app.get('/hymns/:id', async (request, reply) => {
     const id = Number((request.params as { id: string }).id);
     const hymn = getHymn(id);
     if (!hymn) return reply.code(404).send({ error: 'Hymn not found' });
-    return { ...hymn, tracks: tracksForHymn(id) };
+    return hymn;
   });
 
   app.post('/hymns', async (request, reply) => {
@@ -304,7 +297,7 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
     if (!getTrack(trackId)) return reply.code(404).send({ error: 'Track not found' });
 
     linkTrack(id, trackId);
-    return reply.code(201).send({ ...getHymn(id), tracks: tracksForHymn(id) });
+    return reply.code(201).send(getHymn(id));
   });
 
   app.delete('/hymns/:id/tracks/:trackId', async (request, reply) => {
@@ -312,7 +305,7 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
     if (unlinkTrack(Number(id), Number(trackId)) === 0) {
       return reply.code(404).send({ error: 'That recording is not linked to this hymn' });
     }
-    return { ...getHymn(Number(id)), tracks: tracksForHymn(Number(id)) };
+    return getHymn(Number(id));
   });
 
   /* ---------------------------------------------------------- tunes, misc */

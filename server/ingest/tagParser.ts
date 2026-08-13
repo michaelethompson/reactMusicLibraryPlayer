@@ -5,6 +5,7 @@ import {
   canonicalTuneName,
   clean,
   parseBoolean,
+  parseCount,
   parseHymnNumber,
   parseYear,
   splitMulti,
@@ -21,8 +22,10 @@ export interface ParsedTags {
   tuneName: string | null;
   altTuneNames: string[];
   meter: string | null;
+  tempoBpm: number | null;
+  musicKey: string | null;
+  verseCount: number | null;
   arrangement: string | null;
-  verses: string | null;
   copyrightHolder: string | null;
   copyrightYear: number | null;
   license: string | null;
@@ -65,6 +68,10 @@ export async function parseTags(filePath: string): Promise<ParsedTags> {
       .filter((name): name is string => name !== null),
   )];
 
+  // VERSE_COUNT wins, but a VERSES list like "1,2,4" implies a count too.
+  const verseCount =
+    parseCount(first(TAG_FRAMES.verseCount)) ?? (splitMulti(first(TAG_FRAMES.verses)).length || null);
+
   return {
     title: clean(first(TAG_FRAMES.title) ?? metadata.common.title),
     firstLine: clean(first(TAG_FRAMES.firstLine)),
@@ -75,8 +82,10 @@ export async function parseTags(filePath: string): Promise<ParsedTags> {
     tuneName: canonicalTuneName(first(TAG_FRAMES.hymnTune)),
     altTuneNames,
     meter: clean(first(TAG_FRAMES.meter)),
+    tempoBpm: parseCount(first(TAG_FRAMES.tempo) ?? first('TBPM')) ?? metadata.common.bpm ?? null,
+    musicKey: clean(first(TAG_FRAMES.musicKey) ?? first('TKEY') ?? metadata.common.key),
+    verseCount,
     arrangement: clean(first(TAG_FRAMES.arrangement)),
-    verses: clean(first(TAG_FRAMES.verses)),
     copyrightHolder: clean(first(TAG_FRAMES.copyright) ?? metadata.common.copyright),
     copyrightYear: parseYear(first(TAG_FRAMES.copyrightYear) ?? first(TAG_FRAMES.copyright)),
     license: clean(first(TAG_FRAMES.license)),
