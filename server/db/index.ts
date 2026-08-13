@@ -1,22 +1,23 @@
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {
+  DB_PATH,
+  MEDIA_ROOT,
+  ORIGINALS_ROOT,
+  SCHEMA_PATH,
+  UPLOAD_TMP,
+} from '../config.ts';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
+export { DB_PATH, MEDIA_ROOT, ORIGINALS_ROOT, UPLOAD_TMP };
 
-export const DB_PATH = path.join(here, 'library.db');
-export const MEDIA_ROOT = path.join(here, '..', 'media', 'audio');
-export const UPLOAD_TMP = path.join(here, '..', 'media', 'tmp');
-export const ORIGINALS_ROOT = path.join(here, '..', 'media', 'originals');
-
-for (const dir of [MEDIA_ROOT, UPLOAD_TMP, ORIGINALS_ROOT]) {
+for (const dir of [path.dirname(DB_PATH), MEDIA_ROOT, UPLOAD_TMP, ORIGINALS_ROOT]) {
   mkdirSync(dir, { recursive: true });
 }
 
 export const db = new DatabaseSync(DB_PATH);
 
-db.exec(readFileSync(path.join(here, 'schema.sql'), 'utf8'));
+db.exec(readFileSync(SCHEMA_PATH, 'utf8'));
 
 function hasColumn(table: string, column: string): boolean {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;

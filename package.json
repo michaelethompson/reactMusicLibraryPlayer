@@ -3,11 +3,15 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "concurrently -n server,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:web": "vite",
     "build": "tsc --noEmit && vite build",
+    "start": "NODE_ENV=production tsx server/index.ts",
     "typecheck": "tsc --noEmit",
     "db:reset": "tsx server/db/reset.ts"
   },
@@ -21,7 +25,8 @@
     "fastify": "^5.11.3",
     "music-metadata": "^11.14.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "tsx": "^4.20.6"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
@@ -29,7 +34,6 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "concurrently": "^9.0.1",
-    "tsx": "^4.19.0",
     "typescript": "^5.6.2",
     "vite": "^5.4.3"
   },

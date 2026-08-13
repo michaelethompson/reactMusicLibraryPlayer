@@ -1,14 +1,14 @@
 import { rmSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const here = path.dirname(fileURLToPath(import.meta.url));
+import { DB_PATH, MEDIA_ROOT, ORIGINALS_ROOT, UPLOAD_TMP } from '../config.ts';
 
 for (const suffix of ['', '-wal', '-shm', '-journal']) {
-  rmSync(path.join(here, `library.db${suffix}`), { force: true });
+  rmSync(`${DB_PATH}${suffix}`, { force: true });
 }
-rmSync(path.join(here, '..', 'media'), { recursive: true, force: true });
+for (const dir of [MEDIA_ROOT, UPLOAD_TMP, ORIGINALS_ROOT]) {
+  rmSync(dir, { recursive: true, force: true });
+}
 
 // Importing rebuilds the schema and the media directories from scratch.
 await import('./index.ts');
-console.log('Database and media store reset.');
+console.log(`Reset ${path.dirname(DB_PATH)} and the media store.`);
