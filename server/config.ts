@@ -12,7 +12,9 @@ export const isProduction = process.env.NODE_ENV === 'production';
  */
 export const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : serverDir;
 
-export const DB_PATH = path.join(DATA_DIR, 'db', 'library.db');
+export const DB_PATH = process.env.DB_PATH
+  ? path.resolve(process.env.DB_PATH)
+  : path.join(DATA_DIR, 'db', 'library.db');
 export const MEDIA_ROOT = path.join(DATA_DIR, 'media', 'audio');
 export const UPLOAD_TMP = path.join(DATA_DIR, 'media', 'tmp');
 export const ORIGINALS_ROOT = path.join(DATA_DIR, 'media', 'originals');

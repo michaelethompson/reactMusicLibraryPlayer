@@ -1,0 +1,14 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:5174"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 5174
+      DATA_DIR: /data
+    volumes:
+      - ./server/db:/data/db
+      - ./server/media:/data/media
