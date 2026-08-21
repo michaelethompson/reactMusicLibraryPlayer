@@ -9,3 +9,4 @@ server/db/*.db
 server/db/*.db-journal
 server/db/*.db-wal
 server/db/*.db-shm
+package-lock.json
