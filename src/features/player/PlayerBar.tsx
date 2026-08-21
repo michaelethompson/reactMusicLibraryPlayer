@@ -25,22 +25,22 @@ export function PlayerBar() {
       </div>
 
       <div className="player-bar__transport">
-        <button type="button" onClick={previous} disabled={!currentTrack} aria-label="Previous item">
+        <button type="button" onClick={previous} disabled={!currentTrack || isPlaying} aria-label="Previous item">
           ⏮
         </button>
         <button
           type="button"
           className="primary"
           onClick={toggle}
-          disabled={!currentTrack}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
+          disabled={!currentTrack || isPlaying}
+          aria-label="Play"
         >
-          {isPlaying ? '❚❚' : '▶'}
+          ▶
         </button>
         <button type="button" onClick={stop} disabled={!currentTrack} aria-label="Stop">
           ■
         </button>
-        <button type="button" onClick={next} disabled={!currentTrack} aria-label="Next item">
+        <button type="button" onClick={next} disabled={!currentTrack || isPlaying} aria-label="Next item">
           ⏭
         </button>
       </div>

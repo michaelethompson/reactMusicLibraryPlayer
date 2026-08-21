@@ -112,8 +112,8 @@ export function PerformView({ serviceId }: Props) {
               <button
                 type="button"
                 className={isCurrent ? 'perform-item is-current' : 'perform-item'}
-                disabled={!item.track}
-                onClick={() => (isCurrent ? toggle() : playIndex(index))}
+                disabled={!item.track || isPlaying}
+                onClick={() => playIndex(index)}
               >
                 <span className="perform-item__index mono">
                   {isCurrent && isPlaying ? '▶' : index + 1}

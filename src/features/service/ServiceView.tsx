@@ -103,8 +103,8 @@ function SortableRow({
           <input type="checkbox" checked={item.autoAdvance} onChange={onToggleAuto} />
           auto
         </label>
-        <button type="button" onClick={() => playIndex(index)} disabled={!item.track}>
-          {isCurrent && isPlaying ? '❚❚' : '▶'}
+        <button type="button" onClick={() => playIndex(index)} disabled={!item.track || isPlaying}>
+          ▶
         </button>
         <button type="button" className="danger" onClick={onRemove} aria-label="Remove item">
           ✕

@@ -18,7 +18,7 @@ interface EditorTarget {
 }
 
 export function LibraryView({ onAddHymn, canAdd }: Props) {
-  const { playTrack, currentTrack } = usePlayer();
+  const { playTrack, currentTrack, isPlaying } = usePlayer();
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const [hymns, setHymns] = useState<Hymn[]>([]);
@@ -193,6 +193,7 @@ export function LibraryView({ onAddHymn, canAdd }: Props) {
                           type="button"
                           onClick={() => playTrack(track)}
                           aria-label="Preview recording"
+                          disabled={isPlaying}
                           className={track.id === currentTrack?.id ? 'is-current' : undefined}
                         >
                           ▶
@@ -237,7 +238,7 @@ export function LibraryView({ onAddHymn, canAdd }: Props) {
                 </div>
                 <div className="track__actions">
                   <span className="mono muted">{formatDuration(track.durationMs)}</span>
-                  <button type="button" onClick={() => playTrack(track)} aria-label="Preview">
+                  <button type="button" onClick={() => playTrack(track)} aria-label="Preview" disabled={isPlaying}>
                     ▶
                   </button>
                   <button type="button" onClick={() => setReview([track])}>

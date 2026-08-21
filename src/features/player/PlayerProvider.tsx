@@ -89,44 +89,48 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const playIndex = useCallback(
     (index: number) => {
+      if (isPlaying) return;
       const item = queue[index];
       if (!item?.track) return;
       setPreviewTrack(null);
       setCurrentIndex(index);
       load(item.track, true);
     },
-    [queue, load],
+    [isPlaying, queue, load],
   );
 
   const playTrack = useCallback(
     (track: Track) => {
+      if (isPlaying) return;
       setCurrentIndex(-1);
       setPreviewTrack(track);
       load(track, true);
     },
-    [load],
+    [isPlaying, load],
   );
 
   const next = useCallback(() => {
+    if (isPlaying) return;
     const upcoming = queue.findIndex((item, index) => index > currentIndex && item.track !== null);
     if (upcoming !== -1) playIndex(upcoming);
-  }, [queue, currentIndex, playIndex]);
+  }, [isPlaying, queue, currentIndex, playIndex]);
 
   const previous = useCallback(() => {
+    if (isPlaying) return;
     for (let index = currentIndex - 1; index >= 0; index -= 1) {
       if (queue[index]?.track) {
         playIndex(index);
         return;
       }
     }
-  }, [queue, currentIndex, playIndex]);
+  }, [isPlaying, queue, currentIndex, playIndex]);
 
   const toggle = useCallback(() => {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
+    if (!audio.paused) return;
     clearAdvanceTimer();
-    if (audio.paused) void audio.play().catch(() => setIsPlaying(false));
-    else audio.pause();
+    void audio.play().catch(() => setIsPlaying(false));
   }, [currentTrack, clearAdvanceTimer]);
 
   const stop = useCallback(() => {
